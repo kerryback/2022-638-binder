@@ -4,7 +4,7 @@ import pymssql
 
 def Prices(stocktrak=None):
     """
-    Keywork argument (optional):
+    Keyword argument (optional):
     stocktrak -- if supplied, should be the pathname of an OpenPosition_date.csv file.
     Example:
     Prices("files/OpenPosition_3_19_2022.csv")
@@ -46,8 +46,10 @@ def Prices(stocktrak=None):
         for tick in prices2.index:
             prices[tick] = prices2.LastPrice.loc[tick]
 
-    return prices
     print("finished prices")
+    conn.close()
+    return prices
+    
 
 if __name__ == "__main__":
     import sys

@@ -59,7 +59,7 @@ def Ranks(model):
     quarterly["roeq"] = quarterly.netinc / quarterly.equitylag
     quarterly = quarterly.groupby("ticker").last()
     quarterly = quarterly[["roeq"]]
-    print("finished roeq", quarterly.shape[0])
+    print("finished roeq")
     print(quarterly.count(), "\n")
 
     ###################################################
@@ -73,7 +73,7 @@ def Ranks(model):
         select datekey as date, ticker, netinc, ncfo, assets, assetsavg, equity,
         equityavg, revenue, cor, liabilities, marketcap, sgna, intexp, sharesbas
         from sf1
-        where dimension='ARY' and assets>0 and equity>0 and reportperiod>='2021-01-01'
+        where dimension='ARY' and assets>0 and equity>0 and reportperiod>='2020-01-01'
         order by ticker, datekey
         """,
         conn
@@ -90,7 +90,7 @@ def Ranks(model):
     annual["operprof"] = (annual.revenue-annual.cor-annual.sgna-annual.intexp) / annual.equitylag
     annual = annual.groupby("ticker").last()
     annual = annual[["acc", "agr", "bm", "ep", "gma", "lev", "operprof"]]
-    print("finished annual predictors", annual.shape[0])
+    print("finished annual predictors")
     print(annual.count(), "\n")
     
     #######################################################
@@ -107,7 +107,7 @@ def Ranks(model):
     prices = pd.read_sql(string, conn)
     prices = prices.dropna()
     prices["date"] = pd.to_datetime(prices.date)
-    print("got daily prices", prices.shape[0])
+    print("got daily prices")
     print(prices.count(), "\n")
     
     ##########################################################
@@ -125,7 +125,7 @@ def Ranks(model):
     returns = weekly.groupby("ticker").closeadj.pct_change()
     returns = returns.reset_index()
     returns.columns = ["ticker", "date", "ret"]
-    print("computed weekly returns", returns.shape[0])
+    print("computed weekly returns")
     print(returns.count(), "\n")
     
     ##############################################################
@@ -152,7 +152,7 @@ def Ranks(model):
             
     regression = returns.groupby("ticker").apply(regr)
     regression = regression.groupby("ticker").last()
-    print("computed betas and idiosyncratic vols", regression.shape[0])
+    print("computed betas and idiosyncratic vols")
     print(regression.count(), "\n")
     
     ################################################################
@@ -170,7 +170,7 @@ def Ranks(model):
     momentum = prices[["ticker", "date", "mom12m", "mom1m"]]
     momentum = momentum.groupby("ticker").last()
     momentum = momentum[["mom12m", "mom1m"]]
-    print("computed momentum variables", momentum.shape[0])
+    print("computed momentum variables")
     print(momentum.count(), "\n")
     
     ####################################################################
@@ -186,7 +186,7 @@ def Ranks(model):
     mktcap = mktcap.dropna()
     mktcap = mktcap.set_index("ticker")
     mktcap["mve"] = np.log(mktcap.marketcap)
-    print("got market cap", mktcap.shape[0])
+    print("got market cap")
     print(mktcap.count(), "\n")
     
     #######################################################################
@@ -204,6 +204,7 @@ def Ranks(model):
     mod = load(model)
     predict = pd.Series(mod.predict(X), index=X.index)
     print("finished ranks", predict.shape[0])
+    conn.close()
     return predict.rank(ascending=False)
 
 if __name__ == "__main__":
