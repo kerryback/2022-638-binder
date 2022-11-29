@@ -24,20 +24,24 @@ def backtest(data, features, target, pipe, numstocks):
             out["ret"] = present.ret 
             df = pd.concat((df, out))
     
-    df["rnk"] = df.groupby("date").predict.rank(method="first", ascending=False)
-    best = df[df.rnk<=numstocks]
-    df["rnk"] = df.groupby("date").predict.rank(method="first")
-    worst = df[df.rnk<=numstocks]
+    numstocks = numstocks if isinstance(numstocks, list) else [numstocks]
+    lst = []
+    for num in numstocks:
+        df["rnk"] = df.groupby("date").predict.rank(method="first", ascending=False)
+        best = df[df.rnk<=num]
+        df["rnk"] = df.groupby("date").predict.rank(method="first")
+        worst = df[df.rnk<=num]
 
-    best_rets = best.groupby("date").ret.mean()
-    worst_rets = worst.groupby("date").ret.mean()
-    rets = pd.concat((best_rets, worst_rets), axis=1)
-    rets.columns = ["best", "worst"]
-    return rets
+        best_rets = best.groupby("date").ret.mean()
+        worst_rets = worst.groupby("date").ret.mean()
+        rets = pd.concat((best_rets, worst_rets), axis=1)
+        rets.columns = ["best", "worst"]
+        lst.append(rets)
+    return rets if len(rets)>1 else rets[0]
 
 def cumplot(rets):
     traces = []
-    for ret in [x for x in rets.columns if x !="date"]:
+    for ret in ["best", "market", "worst"]:
         trace = go.Scatter(
             x=rets.date,
             y=(1+rets[ret]).cumprod(),
@@ -50,7 +54,7 @@ def cumplot(rets):
     for trace in traces:
         fig.add_trace(trace)
     fig.update_layout(
-        template="none",
+        template="plotly_white",
         yaxis_tickprefix="$",
         hovermode="x unified",
         legend=dict(
@@ -63,7 +67,7 @@ def cumplot(rets):
     return fig
 
 def mvplot(df):
-    rets = df.copy().set_index("date")
+    rets = df.copy().set_index("date")[["best", "market", "worst"]]
     r1, r2, r3 = rets.columns.to_list()
     mns = 12*rets.mean()
     sds = np.sqrt(12)*rets.std()
@@ -85,45 +89,49 @@ def mvplot(df):
     def port(m):
         a = (m-mn2) / (mn1-mn2)
         return a*w1 + (1-a)*w2
-
-    trace1 = go.Scatter(
-        x=sds,
-        y=mns,
-        text=rets.columns.to_list(),
-        mode="markers",
-        marker=dict(size=10),
-        hovertemplate="%{text}<br>mn=%{y:.1%}<br>sd=%{x:.1%}<extra></extra>",
-        showlegend=False
-    )
+    
+    traces = []
+    for ret in ["best", "market", "worst"]:
+        trace = go.Scatter(
+            x=[sds[ret]],
+            y=[mns[ret]],
+            mode="markers",
+            marker=dict(size=10),
+            hovertemplate=ret+"<br>mean=%{y:.1%}<br>stdev=%{x:.1%}<extra></extra>",
+            name=ret,
+        )
+        traces.append(trace)
 
     cd = np.empty(shape=(1, 3, 1), dtype=float)
     cd[:, 0] = np.array(w[0])
     cd[:, 1] = np.array(w[1])
     cd[:, 2] = np.array(w[2])
     string = "Tangency portfolio:<br>"
-    string += r1 + ": %{customdata[0]:.1%}<br>"
-    string += r2 + ": %{customdata[1]:.1%}<br>"
-    string += r3 + ": %{customdata[2]:.1%}<br>"
+    string += "best: %{customdata[0]:.1%}<br>"
+    string += "market: %{customdata[1]:.1%}<br>"
+    string += "worst: %{customdata[2]:.1%}<br>"
     string += "<extra></extra>"
-    trace2 = go.Scatter(
+    trace = go.Scatter(
         x=[sd],
         y=[mn],
         mode="markers",
         marker=dict(size=10),
         customdata=cd,
         hovertemplate=string,
-        showlegend=False
+        name="tangency"
     )
+    traces.append(trace)
 
     x = np.linspace(0, mxsd, 51)
     y = rf+x*(mn-rf)/sd
-    trace3 = go.Scatter(
+    trace = go.Scatter(
         x=x,
         y=y,
         mode="lines",
         hovertemplate=f"Sharpe ratio = {(mn-rf)/sd:0.1%}<extra></extra>",
         showlegend=False,
     )
+    traces.append(trace)
 
     maxmn = np.max(y)
     ms = np.linspace(np.min(mns), maxmn, 51)
@@ -132,11 +140,11 @@ def mvplot(df):
     cd = np.empty(shape=(len(ps), 3, 1), dtype=float)
     for i in range(3):
         cd[:, i] = np.array([w[i] for w in ps]).reshape(-1, 1)
-    string = r1 + " = %customdata[0]:.1%}<br>" 
-    string += r2 + " = %customdata[1]:.1%}<br>"
-    string += r3 + " = %customdata[2]:.1%}<br>"
+    string = "best = %customdata[0]:.1%}<br>" 
+    string += "market = %customdata[1]:.1%}<br>"
+    string += "worst = %customdata[2]:.1%}<br>"
     string += "<extra></extra>"
-    trace4 = go.Scatter(
+    trace = go.Scatter(
         x=ss,
         y=ms,
         mode="lines",
@@ -144,19 +152,38 @@ def mvplot(df):
         hovertemplate=string,
         showlegend=False,
     )
+    traces.append(trace)
 
     fig = go.Figure()
-    for trace in [trace1, trace2, trace3, trace4]:
+    for trace in traces:
         fig.add_trace(trace)
     fig.update_layout(
-        template="none",
+        template="plotly_white",
         yaxis_tickformat=".0%",
         xaxis_tickformat=".0%",
         yaxis_title="Annualized Mean",
         xaxis_title="Annualized Standard Deviation",
         xaxis_rangemode="tozero",
         yaxis_rangemode="tozero",
+        legend=dict(
+            yanchor="top", 
+            y=0.99, 
+            xanchor="left", 
+            x=0.01
+        )
     )
     return fig
 
+import statsmodels.formula.api as smf
 
+def regress(rets):
+    x = 100*12*(rets.market - rets.rf)
+    y = 100*12*(rets.best - rets.worst)
+    df = pd.concat((x, y), axis=1)
+    result = smf.ols("y~x", df).fit()
+    table = result.summary2().tables[1]
+    table.index = ["alpha", "beta"]
+    table = table.iloc[:,[0,2,3]]
+    table.columns = ["estimate", "t-stat", "p-value"]
+    table.index.name = "coefficient"
+    return table.round(3)
