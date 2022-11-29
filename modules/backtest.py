@@ -140,9 +140,9 @@ def mvplot(df):
     cd = np.empty(shape=(len(ps), 3, 1), dtype=float)
     for i in range(3):
         cd[:, i] = np.array([w[i] for w in ps]).reshape(-1, 1)
-    string = "best = %customdata[0]:.1%}<br>" 
-    string += "market = %customdata[1]:.1%}<br>"
-    string += "worst = %customdata[2]:.1%}<br>"
+    string = "best = %{customdata[0]:.1%}<br>" 
+    string += "market = %{customdata[1]:.1%}<br>"
+    string += "worst = %{customdata[2]:.1%}<br>"
     string += "<extra></extra>"
     trace = go.Scatter(
         x=ss,
