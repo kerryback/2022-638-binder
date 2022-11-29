@@ -176,9 +176,9 @@ def mvplot(df):
 
 import statsmodels.formula.api as smf
 
-def regress(rets):
+def regress(rets, y):
     x = 100*12*(rets.market - rets.rf)
-    y = 100*12*(rets.best - rets.worst)
+    y = 100*12*(rets[y] - rets.rf)
     df = pd.concat((x, y), axis=1)
     result = smf.ols("y~x", df).fit()
     table = result.summary2().tables[1]
